@@ -6,10 +6,6 @@ playlist, flags videos added since the last check, and downloads the ones you
 pick as audio (m4a) or video (mp4, capped resolution). Runs on Android, Linux
 and Windows. No backend: all state is a few JSON files on the device.
 
-App id `com.irrelevant.downloadhq`. It used to be PLM (`com.nayeem.plm`): on
-desktop the old library, settings and tools are copied over on first launch;
-on Android the new id is a separate app, so the old one's data stays with it.
-
 Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp).
 
 ## Features
@@ -145,9 +141,3 @@ dart run tool/smoke.dart /tmp/dhq <playlist>   # desktop engine against live You
 dart run tool/adblock_bench.dart lists/*.txt   # ad block engine on real filter lists
 ```
 
-## Not done yet (deliberately)
-
-- Android background playback and lock-screen controls (would need `audio_service`).
-- Checking for new videos while the app is closed (would need WorkManager).
-- Private playlists and sign-in (would need cookies). Sites that require an
-  account (Vimeo now does) say so in the Browse bar.
