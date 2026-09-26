@@ -68,7 +68,7 @@ class AppSettings {
   /// Video downloads carry the uploader's subtitles, when there are any.
   final bool embedSubtitles;
 
-  static const defaultHomePage = 'https://duckduckgo.com/';
+  static const defaultHomePage = 'https://youtube.com';
 
   String get home => homePage ?? defaultHomePage;
 
