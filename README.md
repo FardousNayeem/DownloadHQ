@@ -34,7 +34,7 @@ Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp).
 - Per-playlist settings: audio or video, max quality, auto-download new videos.
 - Download queue with a concurrency limit, progress, speed, ETA, cancel and retry.
 - Built-in player (audio and video) with a queue, shuffle, and a mini player.
-- Checks for new videos on saved playlist on launch, when you come back to the app, and every N hours while it is open.
+- Checks for new videos on saved playlist on launch.
 
 
 ## Architecture
