@@ -47,26 +47,15 @@ Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp).
 
 ```
 lib/
-  domain/     models, sync_diff (pure: merge remote listing into local state)
-              adblock (pure: filter list parser, rule matching, page script)
-  engine/     YtDlpEngine interface
-              ytdlp_cli.dart      pure: flags in, parsed output out (shared)
-              process_engine.dart desktop adapter (spawns the yt-dlp binary)
-              android_engine.dart Android adapter (platform channel)
-              desktop_tools.dart  finds and installs yt-dlp / ffmpeg / deno
-  data/       JsonStore (atomic writes) + repositories
-  services/   LibraryService, DownloadQueue, AutoSync, ToolsService,
-              PlaybackService, GrabService, AdblockService, ShareService
-              (no widgets)
-  app/        bootstrap.dart (composition root, the only platform switch), theme
-  ui/         screens and widgets; they read services, they don't do IO
-android/.../MainActivity.kt   thin bridge: run(args) on youtubedl-android,
-                              plus shared links
+  domain/     models and logic
+  engine/     yt-dlp integration (YtDlpEngine, ytdlp_cli, process_engine)
+  data/       persistence (JsonStore, repositories)
+  services/   app use-cases and orchestration 
+  app/        startup, theme, composition
+  ui/         screens, widgets
+
 ```
 
-Dependencies only point one way: ui → services → engine/data → domain. All
-yt-dlp flag handling lives in `ytdlp_cli.dart`, so both platforms send the same
-command.
 
 ## Running
 
