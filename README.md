@@ -10,31 +10,6 @@ Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp).
 
 ## Features
 
-- **Opens on the browser.** The home page (YouTube by default, change it in
-  Settings or from the browser menu) loads straight away.
-- **Built-in ad blocker** on every page and frame, with uBlock Origin's
-  default filter lists: uBlock filters (ads, privacy, quick fixes), EasyList,
-  EasyPrivacy and Peter Lowe's list, plus optional AdGuard Mobile Ads and
-  EasyList Cookie notices. Lists refresh every 4 days. The shield in the
-  toolbar shows what was blocked and pauses blocking for one site. See
-  [Ad blocking](#ad-blocking).
-- **SponsorBlock** for YouTube downloads: mark sponsor segments as chapters
-  or cut them out. Chapters are embedded; subtitles optionally.
-- **Share to DownloadHQ** (Android): share a link from the YouTube app or any
-  browser and it opens in the in-app browser, ready to save.
-- Add a playlist by link. The first check imports everything; later checks mark
-  new arrivals **NEW**, with a count badge on the Library tab.
-- Select and download, or **Skip** videos you don't want (they stay hidden
-  until you bring them back).
-- Per-playlist settings: audio or video, max quality, auto-download new videos.
-- Videos removed from the playlist or made private on YouTube stay in your
-  library if you downloaded them.
-- Download queue with a concurrency limit, progress, speed, ETA, cancel and retry.
-- Built-in player (audio and video) with a queue, shuffle, and a mini player.
-- Checks for new videos on launch, when you come back to the app, and every N
-  hours while it is open.
-- Desktop: installs and updates yt-dlp, ffmpeg and deno itself (Settings → Tools).
-- If you delete files outside the app, it notices and marks them not downloaded.
 - **Browse tab**: a built-in browser. Every page you open is checked by yt-dlp
   in the background (YouTube, SoundCloud, Bandcamp, Internet Archive, and the
   [other sites yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)).
@@ -42,6 +17,25 @@ Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp).
   and a quality, and download. Pages that list many items (channels, albums,
   playlists) let you pick which ones. On a YouTube playlist you can also
   **track** it for new videos. Grabs go to a "From the web" collection.
+
+- **Built-in ad blocker** on every page and frame, with uBlock Origin's
+  default filter lists: uBlock filters (ads, privacy, quick fixes), EasyList,
+  EasyPrivacy and Peter Lowe's list, plus optional AdGuard Mobile Ads and
+  EasyList Cookie notices. Lists refresh every 4 days. The shield in the
+  toolbar shows what was blocked and pauses blocking for one site. See
+  [Ad blocking](#ad-blocking).
+
+- **Share to DownloadHQ** (Android): share a link from the YouTube app or any
+  browser and it opens in the in-app browser, ready to save.
+- Add a playlist by link. The first check imports everything; later checks mark
+  new arrivals **NEW**, with a count badge on the Library tab.
+- Select and download, or **Skip** videos you don't want (they stay hidden
+  until you bring them back).
+- Per-playlist settings: audio or video, max quality, auto-download new videos.
+- Download queue with a concurrency limit, progress, speed, ETA, cancel and retry.
+- Built-in player (audio and video) with a queue, shuffle, and a mini player.
+- Checks for new videos on saved playlist on launch, when you come back to the app, and every N hours while it is open.
+
 
 ## Architecture
 
