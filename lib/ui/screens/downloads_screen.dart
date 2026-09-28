@@ -56,6 +56,7 @@ class _JobRow extends StatelessWidget {
     final status = switch (job.state) {
       JobState.queued => 'Waiting',
       JobState.failed => job.error ?? 'Failed',
+      JobState.running when job.note != null => job.note!,
       JobState.running => [
         if (pr?.fraction != null) '${(pr!.fraction! * 100).round()}%',
         if (pr?.speedBps != null) formatSpeed(pr!.speedBps),
@@ -74,7 +75,7 @@ class _JobRow extends StatelessWidget {
               children: [
                 Text(job.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.bodyLarge),
                 const SizedBox(height: 6),
-                if (job.state == JobState.running)
+                if (job.state == JobState.running && job.note == null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: LinearProgressIndicator(value: pr?.fraction, minHeight: 3),

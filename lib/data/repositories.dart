@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../domain/models.dart';
+import '../domain/subtitles.dart';
 import 'json_store.dart';
 
 /// Where playlists live. Interface so a database can replace JSON later
@@ -45,7 +46,11 @@ class AppSettings {
     this.lastGrabMode = MediaMode.video,
     this.homePage,
     this.sponsorBlock = SponsorBlock.off,
-    this.embedSubtitles = false,
+    this.subtitleMode = SubtitleMode.embed,
+    this.autoCaptions = true,
+    this.cookiesFile,
+    this.autoUpdateYtDlp = true,
+    this.lastYtDlpUpdate,
   });
 
   final String downloadDir;
@@ -65,10 +70,22 @@ class AppSettings {
   /// sponsor.ajay.app, applied by yt-dlp).
   final SponsorBlock sponsorBlock;
 
-  /// Video downloads carry the uploader's subtitles, when there are any.
-  final bool embedSubtitles;
+  /// What happens to English subtitles of video downloads.
+  final SubtitleMode subtitleMode;
 
-  static const defaultHomePage = 'https://youtube.com';
+  /// Use YouTube's automatic captions when a video has no real subtitles.
+  final bool autoCaptions;
+
+  /// A cookies.txt the user exported from a desktop browser. Used for
+  /// sign-in walls before the in-app browser's own cookies.
+  final String? cookiesFile;
+
+  /// Update yt-dlp by itself once a day. Sites change often; an old yt-dlp
+  /// is the usual reason downloads start failing.
+  final bool autoUpdateYtDlp;
+  final DateTime? lastYtDlpUpdate;
+
+  static const defaultHomePage = 'https://m.youtube.com';
 
   String get home => homePage ?? defaultHomePage;
 
@@ -82,7 +99,11 @@ class AppSettings {
     MediaMode? lastGrabMode,
     Object? homePage = _keep,
     SponsorBlock? sponsorBlock,
-    bool? embedSubtitles,
+    SubtitleMode? subtitleMode,
+    bool? autoCaptions,
+    Object? cookiesFile = _keep,
+    bool? autoUpdateYtDlp,
+    DateTime? lastYtDlpUpdate,
   }) => AppSettings(
     downloadDir: downloadDir ?? this.downloadDir,
     parallelDownloads: parallelDownloads ?? this.parallelDownloads,
@@ -91,7 +112,11 @@ class AppSettings {
     lastGrabMode: lastGrabMode ?? this.lastGrabMode,
     homePage: identical(homePage, _keep) ? this.homePage : homePage as String?,
     sponsorBlock: sponsorBlock ?? this.sponsorBlock,
-    embedSubtitles: embedSubtitles ?? this.embedSubtitles,
+    subtitleMode: subtitleMode ?? this.subtitleMode,
+    autoCaptions: autoCaptions ?? this.autoCaptions,
+    cookiesFile: identical(cookiesFile, _keep) ? this.cookiesFile : cookiesFile as String?,
+    autoUpdateYtDlp: autoUpdateYtDlp ?? this.autoUpdateYtDlp,
+    lastYtDlpUpdate: lastYtDlpUpdate ?? this.lastYtDlpUpdate,
   );
 
   Map<String, dynamic> toJson() => {
@@ -102,7 +127,11 @@ class AppSettings {
     'lastGrabMode': lastGrabMode.name,
     'homePage': homePage,
     'sponsorBlock': sponsorBlock.name,
-    'embedSubtitles': embedSubtitles,
+    'subtitleMode': subtitleMode.name,
+    'autoCaptions': autoCaptions,
+    'cookiesFile': cookiesFile,
+    'autoUpdateYtDlp': autoUpdateYtDlp,
+    'lastYtDlpUpdate': lastYtDlpUpdate?.toIso8601String(),
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j, String defaultDir) => AppSettings(
@@ -113,7 +142,14 @@ class AppSettings {
     lastGrabMode: MediaMode.values.asNameMap()[j['lastGrabMode']] ?? MediaMode.video,
     homePage: j['homePage'] as String?,
     sponsorBlock: SponsorBlock.values.asNameMap()[j['sponsorBlock']] ?? SponsorBlock.off,
-    embedSubtitles: j['embedSubtitles'] as bool? ?? false,
+    subtitleMode:
+        SubtitleMode.values.asNameMap()[j['subtitleMode']] ??
+        // Before modes there was one switch; an explicit "off" stays off.
+        (j['embedSubtitles'] == false ? SubtitleMode.off : SubtitleMode.embed),
+    autoCaptions: j['autoCaptions'] as bool? ?? true,
+    cookiesFile: j['cookiesFile'] as String?,
+    autoUpdateYtDlp: j['autoUpdateYtDlp'] as bool? ?? true,
+    lastYtDlpUpdate: DateTime.tryParse(j['lastYtDlpUpdate'] as String? ?? ''),
   );
 }
 

@@ -11,8 +11,8 @@ Future<void> main() async {
   MediaKit.ensureInitialized();
   final services = await Services.create();
   runApp(AppScope(services: services, child: const DownloadHqApp()));
-  services.tools.refresh();
   services.autoSync.start();
+  _startTools(services);
   // Fresh filter lists on first run and every few days after.
   services.adblock.updateLists();
 }
@@ -36,5 +36,15 @@ class DownloadHqApp extends StatelessWidget {
         home: const Shell(),
       ),
     );
+  }
+}
+
+/// Tool status for Settings, then a daily yt-dlp update when that is on.
+Future<void> _startTools(Services s) async {
+  await s.tools.refresh();
+  final settings = s.settings;
+  if (!settings.value.autoUpdateYtDlp) return;
+  if (await s.tools.autoUpdateIfDue(last: settings.value.lastYtDlpUpdate)) {
+    settings.update((v) => v.copyWith(lastYtDlpUpdate: DateTime.now()));
   }
 }

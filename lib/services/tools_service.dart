@@ -90,6 +90,24 @@ class ToolsService extends ChangeNotifier {
     await refresh();
   }
 
+  /// Updates yt-dlp when the last update is a day old or more. Quiet: a
+  /// failure (offline) waits for the next launch. Returns true if it ran.
+  Future<bool> autoUpdateIfDue({required DateTime? last, DateTime? now}) async {
+    final t = now ?? DateTime.now();
+    if (busy || !updateDue(last, t)) return false;
+    if (status == null) await refresh();
+    final yt = status?.tools.where((x) => x.name == 'yt-dlp').firstOrNull;
+    if (yt == null || !yt.found) return false;
+    try {
+      await _run('yt-dlp', () async => await _engine.updateYtDlp());
+      await refresh();
+      return true;
+    } catch (e) {
+      debugPrint('DownloadHQ: yt-dlp auto update: $e');
+      return false;
+    }
+  }
+
   Future<void> updateYtDlp() async {
     if (busy) return;
     try {
@@ -117,3 +135,6 @@ class ToolsService extends ChangeNotifier {
     }
   }
 }
+
+@visibleForTesting
+bool updateDue(DateTime? last, DateTime now) => last == null || now.difference(last) >= const Duration(hours: 24);

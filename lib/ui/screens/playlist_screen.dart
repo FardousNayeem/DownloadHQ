@@ -7,6 +7,7 @@ import '../../domain/models.dart';
 import '../../services/download_queue.dart';
 import '../format.dart';
 import '../widgets/common.dart';
+import '../widgets/entry_actions.dart';
 
 enum _Filter {
   all('All'),
@@ -40,6 +41,14 @@ class PlaylistScreen extends StatefulWidget {
 class _PlaylistScreenState extends State<PlaylistScreen> {
   _Filter? _filter;
   final Set<String> _selected = {};
+  String _query = '';
+  final _searchFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _searchFocus.dispose();
+    super.dispose();
+  }
 
   void _toggle(String id) => setState(() => _selected.contains(id) ? _selected.remove(id) : _selected.add(id));
 
@@ -53,111 +62,127 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         if (p == null) return const Scaffold(body: SizedBox.shrink());
         // Open on "New" when there is something new to look at.
         final filter = _filter ??= p.newCount > 0 ? _Filter.fresh : _Filter.all;
-        final visible = p.entries.where(filter.test).toList();
+        final visible = p.entries.where((e) => filter.test(e) && matchesQuery(_query, [e.title, e.channel])).toList();
         _selected.removeWhere((id) => !(p.entry(id)?.isPending ?? false));
         final selectable = visible.where((e) => e.isPending && s.queue.jobFor(p.id, e.id) == null).toList();
 
-        return Scaffold(
-          body: CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                title: Text(p.title, overflow: TextOverflow.ellipsis),
-                actions: [
-                  if (p.downloadedCount > 0)
+        return CallbackShortcuts(
+          bindings: searchShortcuts(_searchFocus),
+          child: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  pinned: true,
+                  title: Text(p.title, overflow: TextOverflow.ellipsis),
+                  actions: [
+                    if (p.downloadedCount > 0)
+                      IconButton(
+                        tooltip: 'Play saved',
+                        icon: const Icon(PhosphorIconsFill.play),
+                        onPressed: () => s.playback.playAll(p.entries),
+                      ),
+                    if (!p.isWeb)
+                      IconButton(
+                        tooltip: 'Check for new videos',
+                        onPressed: s.library.isSyncing(p.id) ? null : () => s.library.sync(p.id),
+                        icon: s.library.isSyncing(p.id)
+                            ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(PhosphorIconsRegular.arrowsClockwise),
+                      ),
                     IconButton(
-                      tooltip: 'Play saved',
-                      icon: const Icon(PhosphorIconsFill.play),
-                      onPressed: () => s.playback.playAll(p.entries),
+                      tooltip: p.isWeb ? 'Options' : 'Playlist options',
+                      icon: const Icon(PhosphorIconsRegular.slidersHorizontal),
+                      onPressed: () => _showOptions(context, p),
                     ),
-                  if (!p.isWeb)
-                    IconButton(
-                      tooltip: 'Check for new videos',
-                      onPressed: s.library.isSyncing(p.id) ? null : () => s.library.sync(p.id),
-                      icon: s.library.isSyncing(p.id)
-                          ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(PhosphorIconsRegular.arrowsClockwise),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+                SliverToBoxAdapter(child: _Header(playlist: p)),
+                if (p.entries.length > 1)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(Tokens.gutter, 0, Tokens.gutter, 12),
+                      child: SearchField(
+                        hint: 'Search ${p.entries.length} videos',
+                        focusNode: _searchFocus,
+                        onChanged: (v) => setState(() => _query = v),
+                      ),
                     ),
-                  IconButton(
-                    tooltip: p.isWeb ? 'Options' : 'Playlist options',
-                    icon: const Icon(PhosphorIconsRegular.slidersHorizontal),
-                    onPressed: () => _showOptions(context, p),
                   ),
-                  const SizedBox(width: 8),
-                ],
-              ),
-              SliverToBoxAdapter(child: _Header(playlist: p)),
-              if (p.newCount > 0 && filter == _Filter.fresh)
+                if (p.newCount > 0 && filter == _Filter.fresh)
+                  SliverToBoxAdapter(
+                    child: _NewBanner(
+                      count: p.newCount,
+                      onSelectAll: () => setState(() => _selected.addAll(selectable.map((e) => e.id))),
+                      onDismiss: () {
+                        s.library.acknowledgeNew(p.id);
+                        setState(() => _filter = _Filter.all);
+                      },
+                    ),
+                  ),
                 SliverToBoxAdapter(
-                  child: _NewBanner(
-                    count: p.newCount,
-                    onSelectAll: () => setState(() => _selected.addAll(selectable.map((e) => e.id))),
-                    onDismiss: () {
-                      s.library.acknowledgeNew(p.id);
-                      setState(() => _filter = _Filter.all);
-                    },
+                  child: _FilterBar(
+                    playlist: p,
+                    current: filter,
+                    onChanged: (f) => setState(() => _filter = f),
+                    onSelectAll: selectable.isEmpty
+                        ? null
+                        : () => setState(() {
+                            final ids = selectable.map((e) => e.id);
+                            _selected.containsAll(ids) ? _selected.removeAll(ids) : _selected.addAll(ids);
+                          }),
+                    allSelected: selectable.isNotEmpty && _selected.containsAll(selectable.map((e) => e.id)),
                   ),
                 ),
-              SliverToBoxAdapter(
-                child: _FilterBar(
-                  playlist: p,
-                  current: filter,
-                  onChanged: (f) => setState(() => _filter = f),
-                  onSelectAll: selectable.isEmpty
-                      ? null
-                      : () => setState(() {
-                          final ids = selectable.map((e) => e.id);
-                          _selected.containsAll(ids) ? _selected.removeAll(ids) : _selected.addAll(ids);
-                        }),
-                  allSelected: selectable.isNotEmpty && _selected.containsAll(selectable.map((e) => e.id)),
-                ),
-              ),
-              if (visible.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: EmptyState(
-                    icon: PhosphorIconsRegular.checks,
-                    title: 'Nothing here',
-                    body: switch (filter) {
-                      _Filter.fresh => 'No new videos since the last check.',
-                      _Filter.notSaved => 'Everything in this playlist is saved.',
-                      _Filter.saved => 'Pick videos from the list and download them to see them here.',
-                      _ => 'No videos match this filter.',
+                if (visible.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: EmptyState(
+                      icon: _query.isEmpty ? PhosphorIconsRegular.checks : PhosphorIconsRegular.magnifyingGlass,
+                      title: _query.isEmpty ? 'Nothing here' : 'No matches',
+                      body: switch (filter) {
+                        _ when _query.isNotEmpty =>
+                          'No video in ${filter == _Filter.all ? 'this playlist' : '"${filter.label}"'} matches "${_query.trim()}".',
+                        _Filter.fresh => 'No new videos since the last check.',
+                        _Filter.notSaved => 'Everything in this playlist is saved.',
+                        _Filter.saved => 'Pick videos from the list and download them to see them here.',
+                        _ => 'No videos match this filter.',
+                      },
+                    ),
+                  )
+                else
+                  SliverList.builder(
+                    itemCount: visible.length,
+                    itemBuilder: (context, i) {
+                      final e = visible[i];
+                      return _EntryRow(
+                        playlist: p,
+                        entry: e,
+                        job: s.queue.jobFor(p.id, e.id),
+                        selected: _selected.contains(e.id),
+                        onToggle: () => _toggle(e.id),
+                      );
                     },
                   ),
-                )
-              else
-                SliverList.builder(
-                  itemCount: visible.length,
-                  itemBuilder: (context, i) {
-                    final e = visible[i];
-                    return _EntryRow(
-                      playlist: p,
-                      entry: e,
-                      job: s.queue.jobFor(p.id, e.id),
-                      selected: _selected.contains(e.id),
-                      onToggle: () => _toggle(e.id),
-                    );
-                  },
-                ),
-              const SliverToBoxAdapter(child: SizedBox(height: 120)),
-            ],
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              ],
+            ),
+            bottomNavigationBar: _selected.isEmpty
+                ? null
+                : _SelectionBar(
+                    count: _selected.length,
+                    onClear: () => setState(_selected.clear),
+                    onSkip: () {
+                      s.library.setIgnored(p.id, {..._selected}, true);
+                      setState(_selected.clear);
+                    },
+                    onDownload: () {
+                      s.queue.enqueue(p.id, [..._selected]);
+                      showMessage(context, 'Queued ${_selected.length} for download');
+                      setState(_selected.clear);
+                    },
+                  ),
           ),
-          bottomNavigationBar: _selected.isEmpty
-              ? null
-              : _SelectionBar(
-                  count: _selected.length,
-                  onClear: () => setState(_selected.clear),
-                  onSkip: () {
-                    s.library.setIgnored(p.id, {..._selected}, true);
-                    setState(_selected.clear);
-                  },
-                  onDownload: () {
-                    s.queue.enqueue(p.id, [..._selected]);
-                    showMessage(context, 'Queued ${_selected.length} for download');
-                    setState(_selected.clear);
-                  },
-                ),
         );
       },
     );
@@ -334,8 +359,8 @@ class _EntryRow extends StatelessWidget {
       color: selected ? t.colorScheme.primary.withValues(alpha: 0.10) : Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        onLongPress: e.isDownloaded ? () => _confirmDelete(context) : null,
-        onSecondaryTap: e.isDownloaded ? () => _confirmDelete(context) : null,
+        onLongPress: () => _actions(context),
+        onSecondaryTap: () => _actions(context),
         child: Opacity(
           opacity: dim ? 0.45 : 1,
           child: Padding(
@@ -387,7 +412,7 @@ class _EntryRow extends StatelessWidget {
                   job: job,
                   selected: selected,
                   onToggle: onToggle,
-                  onDelete: () => _confirmDelete(context),
+                  onMore: () => _actions(context),
                 ),
               ],
             ),
@@ -402,6 +427,7 @@ class _EntryRow extends StatelessWidget {
       return switch (job.state) {
         JobState.queued => 'Waiting',
         JobState.failed => job.error ?? 'Failed',
+        JobState.running when job.note != null => job.note!,
         JobState.running => [
           if (job.progress?.fraction != null) '${(job.progress!.fraction! * 100).round()}%',
           if (job.progress?.speedBps != null) formatSpeed(job.progress!.speedBps),
@@ -416,23 +442,7 @@ class _EntryRow extends StatelessWidget {
     return null;
   }
 
-  Future<void> _confirmDelete(BuildContext context) async {
-    final s = AppScope.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Delete download?'),
-        content: Text('The file for "${entry.title}" is removed from this device. You can download it again later.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Keep')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    await s.playback.forget(entry.id);
-    await s.library.deleteDownload(playlist.id, entry.id);
-  }
+  void _actions(BuildContext context) => showEntryActions(context, playlistId: playlist.id, entryId: entry.id);
 }
 
 extension on String {
@@ -446,10 +456,10 @@ class _Trailing extends StatelessWidget {
     required this.job,
     required this.selected,
     required this.onToggle,
-    required this.onDelete,
+    required this.onMore,
   });
 
-  final VoidCallback onDelete;
+  final VoidCallback onMore;
 
   final Playlist playlist;
   final Entry entry;
@@ -481,16 +491,12 @@ class _Trailing extends StatelessWidget {
       };
     }
     if (entry.isDownloaded) {
-      // Saved: the check doubles as the menu, so delete is findable on
-      // desktop too (long-press and right-click also work).
-      return PopupMenuButton<String>(
+      // Saved: the check doubles as the menu button, so the file actions
+      // are findable on desktop too (long-press and right-click also work).
+      return IconButton(
         tooltip: 'Saved. More options',
+        onPressed: onMore,
         icon: Icon(PhosphorIconsFill.checkCircle, color: cs.primary, size: 22),
-        onSelected: (v) => v == 'play' ? s.playback.playAll(playlist.entries, start: entry) : onDelete(),
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'play', child: Text('Play')),
-          PopupMenuItem(value: 'delete', child: Text('Delete download')),
-        ],
       );
     }
     if (entry.isPending) {

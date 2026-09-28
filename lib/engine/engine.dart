@@ -8,12 +8,12 @@ abstract interface class YtDlpEngine {
   Future<EngineStatus> status();
 
   /// Lists a playlist without downloading anything (`--flat-playlist -J`).
-  Future<RemotePlaylist> fetchPlaylist(String url);
+  Future<RemotePlaylist> fetchPlaylist(String url, {String? cookiesFile});
 
   /// Asks yt-dlp what it can download from any page: one item, or the
   /// entries of a playlist-like page. Throws [EngineException] when the
   /// page has nothing yt-dlp understands.
-  Future<ProbeResult> probe(String url);
+  Future<ProbeResult> probe(String url, {String? cookiesFile});
 
   /// Starts one download. Never throws synchronously; failures arrive
   /// through [DownloadTask.result].
@@ -32,6 +32,9 @@ class DownloadSpec {
     required this.thumbsDir,
     this.sponsorBlock = SponsorBlock.off,
     this.subtitles = false,
+    this.autoCaptions = true,
+    this.cookiesFile,
+    this.forceIpv4 = false,
   });
 
   final String url;
@@ -43,8 +46,28 @@ class DownloadSpec {
   final String thumbsDir;
   final SponsorBlock sponsorBlock;
 
-  /// Embed the uploader's subtitles (video only).
+  /// Embed English subtitles (video only).
   final bool subtitles;
+
+  /// Fall back to YouTube's automatic captions when there are no real ones.
+  final bool autoCaptions;
+
+  /// Netscape cookies file from the in-app browser, for signed-in content.
+  final String? cookiesFile;
+  final bool forceIpv4;
+
+  DownloadSpec copyWith({String? cookiesFile, bool? forceIpv4, bool? subtitles}) => DownloadSpec(
+    url: url,
+    fileKey: fileKey,
+    prefs: prefs,
+    outputDir: outputDir,
+    thumbsDir: thumbsDir,
+    sponsorBlock: sponsorBlock,
+    subtitles: subtitles ?? this.subtitles,
+    autoCaptions: autoCaptions,
+    cookiesFile: cookiesFile ?? this.cookiesFile,
+    forceIpv4: forceIpv4 ?? this.forceIpv4,
+  );
 }
 
 class ProbeResult {

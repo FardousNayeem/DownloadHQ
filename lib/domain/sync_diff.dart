@@ -51,8 +51,8 @@ SyncResult mergeRemote(Playlist local, RemotePlaylist remote, DateTime now) {
       merged.add(
         old.copyWith(
           // Unavailable placeholders carry "[Private video]" as title; keep the
-          // real title we saw earlier.
-          title: r.unavailable ? null : r.title,
+          // real title we saw earlier. A title the user chose also stays.
+          title: r.unavailable || old.renamed ? null : r.title,
           channel: r.channel,
           duration: r.duration,
           thumbnailUrl: r.thumbnailUrl,

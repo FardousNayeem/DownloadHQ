@@ -9,15 +9,19 @@ import '../data/repositories.dart';
 import '../engine/android_engine.dart';
 import '../engine/desktop_tools.dart';
 import '../engine/engine.dart';
+import '../engine/ffmpeg.dart';
 import '../engine/process_engine.dart';
 import '../services/adblock_service.dart';
 import '../services/auto_sync.dart';
+import '../services/cookie_service.dart';
+import '../services/creator_profile.dart';
 import '../services/download_queue.dart';
 import '../services/grab_service.dart';
 import '../services/library_service.dart';
 import '../services/playback_service.dart';
 import '../services/settings_service.dart';
 import '../services/share_service.dart';
+import '../services/subtitle_service.dart';
 import '../services/tools_service.dart';
 
 /// The composition root: the one place that knows concrete classes and the
@@ -33,6 +37,8 @@ class Services {
     required this.grab,
     required this.adblock,
     required this.share,
+    required this.subtitles,
+    required this.creator,
   });
 
   final SettingsService settings;
@@ -44,29 +50,43 @@ class Services {
   final GrabService grab;
   final AdblockService adblock;
   final ShareService share;
+  final SubtitleService subtitles;
+  final CreatorProfileService creator;
 
   static Future<Services> create() async {
     final support = await getApplicationSupportDirectory();
     await _migrateFromPlm(support);
 
-    final YtDlpEngine engine;
+    final YtDlpEngine raw;
     DesktopTools? desktop;
     if (Platform.isAndroid) {
-      engine = AndroidEngine();
+      raw = AndroidEngine();
     } else {
       desktop = DesktopTools(p.join(support.path, 'bin'));
-      engine = ProcessEngine(desktop);
+      raw = ProcessEngine(desktop);
     }
-
     final settingsRepo = SettingsRepository(
       JsonStore(p.join(support.path, 'settings.json')),
       await _defaultDownloadDir(),
     );
     final settings = SettingsService(settingsRepo, await settingsRepo.load());
+    // Session files live in the app's own cache, never next to the media.
+    final cookies = CookieService(
+      p.join((await getApplicationCacheDirectory()).path, 'session'),
+      userFile: () => settings.value.cookiesFile,
+    );
+    await cookies.sweep();
+    final YtDlpEngine engine = SignInFallbackEngine(raw, cookies);
     final library = LibraryService(JsonLibraryRepository(JsonStore(p.join(support.path, 'library.json'))), engine);
     await library.load();
 
-    final queue = DownloadQueue(engine, library, settings);
+    final playback = PlaybackService(state: JsonStore(p.join(support.path, 'playback.json')));
+    final subtitles = SubtitleService(
+      Platform.isAndroid ? AndroidFfmpeg() : DesktopFfmpeg(desktop!),
+      library,
+      playback,
+    );
+    final queue = DownloadQueue(engine, library, settings, cookies: cookies, subtitles: subtitles);
     final adblock = AdblockService(support.path);
     await adblock.load();
     return Services._(
@@ -74,8 +94,10 @@ class Services {
       library: library,
       queue: queue,
       grab: GrabService(engine, library, queue),
-      tools: ToolsService(engine, desktop),
-      playback: PlaybackService(),
+      tools: ToolsService(raw, desktop),
+      playback: playback,
+      subtitles: subtitles,
+      creator: CreatorProfileService(),
       autoSync: AutoSync(library, settings),
       adblock: adblock,
       share: ShareService(),

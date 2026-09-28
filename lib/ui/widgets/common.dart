@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
 import '../../app/theme.dart';
@@ -172,4 +173,79 @@ void showMessage(BuildContext context, String text) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(text)));
+}
+
+/// Search box for lists. Ctrl+F focuses it on desktop (see [searchShortcuts]), Esc clears it.
+class SearchField extends StatefulWidget {
+  const SearchField({super.key, required this.hint, required this.onChanged, this.focusNode});
+
+  final String hint;
+  final ValueChanged<String> onChanged;
+  final FocusNode? focusNode;
+
+  @override
+  State<SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<SearchField> {
+  final _c = TextEditingController();
+  late final FocusNode _focus = widget.focusNode ?? FocusNode();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    if (widget.focusNode == null) _focus.dispose();
+    super.dispose();
+  }
+
+  void _clear() {
+    _c.clear();
+    widget.onChanged('');
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return CallbackShortcuts(
+      bindings: {const SingleActivator(LogicalKeyboardKey.escape): _clear},
+      child: TextField(
+        controller: _c,
+        focusNode: _focus,
+        textInputAction: TextInputAction.search,
+        onChanged: (v) {
+          widget.onChanged(v);
+          setState(() {});
+        },
+        onTapOutside: (_) => _focus.unfocus(),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: widget.hint,
+          prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, size: 18, color: cs.onSurfaceVariant),
+          suffixIcon: _c.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: _clear,
+                  icon: Icon(PhosphorIconsBold.x, size: 14, color: cs.onSurfaceVariant),
+                ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shortcuts that focus a search box: Ctrl+F and Cmd+F.
+Map<ShortcutActivator, VoidCallback> searchShortcuts(FocusNode node) => {
+  const SingleActivator(LogicalKeyboardKey.keyF, control: true): node.requestFocus,
+  const SingleActivator(LogicalKeyboardKey.keyF, meta: true): node.requestFocus,
+};
+
+/// Every word of [query] appears in one of [fields], ignoring case.
+bool matchesQuery(String query, Iterable<String?> fields) {
+  final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
+  if (words.isEmpty) return true;
+  final hay = fields.whereType<String>().join(' ').toLowerCase();
+  return words.every(hay.contains);
 }

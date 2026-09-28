@@ -2,12 +2,15 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
 import '../../app/bootstrap.dart';
 import '../../app/theme.dart';
 import '../../data/repositories.dart';
 import '../../domain/models.dart';
+import '../../domain/subtitles.dart';
 import '../../engine/engine.dart';
 import '../../services/adblock_service.dart';
 import '../format.dart';
@@ -21,7 +24,7 @@ class SettingsScreen extends StatelessWidget {
     final s = AppScope.of(context);
     final t = Theme.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([s.settings, s.tools, s.adblock]),
+      listenable: Listenable.merge([s.settings, s.tools, s.adblock, s.subtitles]),
       builder: (context, _) {
         final v = s.settings.value;
         final tools = s.tools;
@@ -74,8 +77,19 @@ class SettingsScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(Tokens.gutter, 12, Tokens.gutter, 0),
                   child: Text(tools.message!, style: t.textTheme.bodySmall),
                 ),
+              SwitchListTile(
+                secondary: const Icon(PhosphorIconsRegular.arrowsClockwise),
+                title: const Text('Update yt-dlp automatically'),
+                subtitle: Text(
+                  v.lastYtDlpUpdate == null
+                      ? 'Once a day, when the app starts'
+                      : 'Once a day, when the app starts. Last: ${formatAgo(v.lastYtDlpUpdate)}',
+                ),
+                value: v.autoUpdateYtDlp,
+                onChanged: (on) => s.settings.update((x) => x.copyWith(autoUpdateYtDlp: on)),
+              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(Tokens.gutter, 12, Tokens.gutter, 0),
+                padding: const EdgeInsets.fromLTRB(Tokens.gutter, 0, Tokens.gutter, 0),
                 child: Text(
                   'YouTube changes often. When downloads start failing, update yt-dlp first.',
                   style: t.textTheme.bodySmall,
@@ -126,12 +140,89 @@ class SettingsScreen extends StatelessWidget {
                   style: t.textTheme.bodySmall,
                 ),
               ),
-              SwitchListTile(
-                secondary: const Icon(PhosphorIconsRegular.subtitles),
-                title: const Text('Embed subtitles in videos'),
-                subtitle: const Text('English subtitles from the uploader, when there are any'),
-                value: v.embedSubtitles,
-                onChanged: (on) => s.settings.update((x) => x.copyWith(embedSubtitles: on)),
+              const _Section('Subtitles'),
+              _Stepper(
+                icon: PhosphorIconsRegular.subtitles,
+                title: 'English subtitles in video downloads',
+                value: v.subtitleMode.index,
+                options: [
+                  for (final m in SubtitleMode.values)
+                    if (m != SubtitleMode.burn || s.subtitles.canBurn || v.subtitleMode == m) m.index,
+                ],
+                label: (i) => SubtitleMode.values[i].label,
+                onChanged: (i) => s.settings.update((x) => x.copyWith(subtitleMode: SubtitleMode.values[i])),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(Tokens.gutter, 0, Tokens.gutter, 4),
+                child: Text(switch (v.subtitleMode) {
+                  SubtitleMode.off => 'Videos are saved without subtitles.',
+                  SubtitleMode.embed =>
+                    'One file per video. The subtitles travel inside it and players like VLC, MPV, '
+                        'Windows Media Player and this app show them on their own. They can still be turned off.',
+                  SubtitleMode.burn =>
+                    'Drawn onto the picture, so they show in every app and when shared, and cannot be '
+                        'turned off. Slow: each video is re-encoded after it downloads.',
+                }, style: t.textTheme.bodySmall),
+              ),
+              if (v.subtitleMode != SubtitleMode.off)
+                SwitchListTile(
+                  secondary: const Icon(PhosphorIconsRegular.closedCaptioning),
+                  title: const Text('Use automatic captions'),
+                  subtitle: const Text("YouTube's generated English captions, when a video has no real subtitles"),
+                  value: v.autoCaptions,
+                  onChanged: (on) => s.settings.update((x) => x.copyWith(autoCaptions: on)),
+                ),
+              const _MergeSubtitlesTile(),
+              const _Section('Sign-in'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(Tokens.gutter, 0, Tokens.gutter, 8),
+                child: Text(
+                  'Private, members-only and age-restricted videos need an account. Sign in to the site on the '
+                  'Browse tab and failed downloads retry with it. Or pick a cookies.txt exported from your '
+                  'desktop browser (for example with the "Get cookies.txt LOCALLY" extension).',
+                  style: t.textTheme.bodySmall,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(PhosphorIconsRegular.cookie),
+                title: const Text('Cookies file'),
+                subtitle: Text(
+                  v.cookiesFile == null
+                      ? 'None. The Browse tab sign-in is used.'
+                      : 'In use, tried before the Browse tab sign-in',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: v.cookiesFile == null
+                    ? null
+                    : IconButton(
+                        tooltip: 'Stop using this file',
+                        icon: const Icon(PhosphorIconsRegular.x),
+                        onPressed: () {
+                          final old = v.cookiesFile;
+                          s.settings.update((x) => x.copyWith(cookiesFile: null));
+                          if (old != null) File(old).delete().ignore();
+                        },
+                      ),
+                onTap: () async {
+                  final f = await openFile(
+                    acceptedTypeGroups: const [
+                      XTypeGroup(label: 'Cookies', extensions: ['txt'], mimeTypes: ['text/plain']),
+                    ],
+                  );
+                  if (f == null) return;
+                  final ok = (await f.readAsString()).contains(RegExp(r'^[^\t\n]+\t(TRUE|FALSE)\t', multiLine: true));
+                  if (!ok) {
+                    if (context.mounted) showMessage(context, 'That is not a Netscape cookies.txt file');
+                    return;
+                  }
+                  // Kept in app storage: Android hands out a temporary copy,
+                  // and a later edit to the original should not half-apply.
+                  final dest = p.join((await getApplicationSupportDirectory()).path, 'user-cookies.txt');
+                  await File(dest).writeAsBytes(await f.readAsBytes(), flush: true);
+                  s.settings.update((x) => x.copyWith(cookiesFile: dest));
+                  if (context.mounted) showMessage(context, 'Cookies file saved. Failed sign-in downloads use it.');
+                },
               ),
               const _Section('Appearance'),
               Padding(
@@ -368,6 +459,47 @@ class _Stepper extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Fixes videos saved before subtitles went inside them: finds the
+/// separate subtitle files and merges them in.
+class _MergeSubtitlesTile extends StatelessWidget {
+  const _MergeSubtitlesTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = AppScope.of(context).subtitles;
+    final t = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          leading: const Icon(PhosphorIconsRegular.filmSlate),
+          title: const Text('Put subtitle files inside saved videos'),
+          subtitle: Text(
+            sub.busy
+                ? 'Checking ${sub.done} of ${sub.total}'
+                : 'For videos saved with a separate .srt or .vtt file next to them. Takes seconds per video.',
+          ),
+          trailing: sub.busy
+              ? SizedBox.square(
+                  dimension: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    value: sub.total == 0 ? null : sub.done / sub.total,
+                  ),
+                )
+              : const Icon(PhosphorIconsRegular.caretRight),
+          onTap: sub.busy ? null : sub.mergeLibrary,
+        ),
+        if (sub.message != null && !sub.busy)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Tokens.gutter, 0, Tokens.gutter, 8),
+            child: Text(sub.message!, style: t.textTheme.bodySmall),
+          ),
+      ],
     );
   }
 }

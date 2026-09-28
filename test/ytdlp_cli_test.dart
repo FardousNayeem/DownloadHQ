@@ -57,7 +57,7 @@ void main() {
     expect(off, isNot(contains('--embed-subs')));
     expect(
       downloadArgs(spec2(MediaMode.video, SponsorBlock.remove, true), const EnvFlags()),
-      containsAllInOrder(['--sponsorblock-remove', 'sponsor,selfpromo,interaction', '--write-subs']),
+      containsAllInOrder(['--sponsorblock-remove', 'sponsor,selfpromo,interaction', '--embed-subs']),
     );
     // Subtitles only go into video files.
     expect(

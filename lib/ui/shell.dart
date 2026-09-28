@@ -6,6 +6,7 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../app/bootstrap.dart';
 import 'route_cover.dart';
 import 'screens/browse_screen.dart';
+import 'screens/creator_screen.dart';
 import 'screens/downloads_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/settings_screen.dart';
@@ -25,7 +26,7 @@ class _ShellState extends State<Shell> {
   static const _browseTab = 0;
   static const _settingsTab = 3;
   int _tab = _browseTab;
-  final _keys = List.generate(4, (_) => GlobalKey<NavigatorState>());
+  final _keys = List.generate(5, (_) => GlobalKey<NavigatorState>());
 
   /// Whether the browser page can be seen right now: its tab is selected and
   /// no sheet, dialog or page sits on top of it.
@@ -85,6 +86,7 @@ class _ShellState extends State<Shell> {
         _tabNavigator(1, LibraryScreen(onOpenSettings: () => _select(_settingsTab))),
         _tabNavigator(2, const DownloadsScreen()),
         _tabNavigator(_settingsTab, const SettingsScreen()),
+        _tabNavigator(4, CreatorScreen(profiles: s.creator)),
       ],
     );
 
@@ -107,6 +109,7 @@ class _ShellState extends State<Shell> {
             'Downloads',
           ),
           (const Icon(PhosphorIconsRegular.gear), const Icon(PhosphorIconsFill.gear), 'Settings'),
+          (const Icon(PhosphorIconsRegular.userCircle), const Icon(PhosphorIconsFill.userCircle), 'Creator'),
         ];
 
         return NavigatorPopHandler(

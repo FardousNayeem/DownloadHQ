@@ -100,6 +100,7 @@ class Entry {
     this.lastError,
     this.sourceUrl,
     this.prefs,
+    this.renamed = false,
   });
 
   final String id;
@@ -107,6 +108,9 @@ class Entry {
   final String? channel;
   final Duration? duration;
   final String? thumbnailUrl;
+
+  /// The user renamed it; syncs keep their title instead of the remote one.
+  final bool renamed;
 
   /// Index in the remote playlist at last sync.
   final int position;
@@ -154,6 +158,7 @@ class Entry {
     Object? filePath = _keep,
     Object? thumbPath = _keep,
     Object? lastError = _keep,
+    bool? renamed,
   }) => Entry(
     id: id,
     firstSeen: firstSeen,
@@ -171,6 +176,7 @@ class Entry {
     lastError: identical(lastError, _keep) ? this.lastError : lastError as String?,
     sourceUrl: sourceUrl,
     prefs: prefs,
+    renamed: renamed ?? this.renamed,
   );
 
   Map<String, dynamic> toJson() => {
@@ -190,6 +196,7 @@ class Entry {
     'lastError': lastError,
     'sourceUrl': sourceUrl,
     'prefs': prefs?.toJson(),
+    if (renamed) 'renamed': true,
   };
 
   factory Entry.fromJson(Map<String, dynamic> j) => Entry(
@@ -209,6 +216,7 @@ class Entry {
     lastError: j['lastError'] as String?,
     sourceUrl: j['sourceUrl'] as String?,
     prefs: j['prefs'] == null ? null : DownloadPrefs.fromJson((j['prefs'] as Map).cast<String, dynamic>()),
+    renamed: j['renamed'] as bool? ?? false,
   );
 }
 

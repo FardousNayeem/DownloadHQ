@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as pth;
 
 import '../data/repositories.dart';
 import '../domain/models.dart';
@@ -200,6 +201,29 @@ class LibraryService extends ChangeNotifier {
     _updateEntry(playlistId, entryId, (e) => e.copyWith(filePath: null));
   }
 
+  /// Gives a saved entry a new title and its file the matching name (the
+  /// `[id]` suffix and extension stay, so it is still recognisable).
+  /// Returns the updated entry. Throws [FileSystemException] when the file
+  /// cannot be renamed (in use on Windows, name taken).
+  Future<Entry?> rename(String playlistId, String entryId, String newTitle) async {
+    final e = byId(playlistId)?.entry(entryId);
+    final title = newTitle.trim();
+    if (e == null || title.isEmpty) return e;
+    String? filePath = e.filePath;
+    if (filePath != null && await File(filePath).exists()) {
+      final stem = renamedStem(title, e.id);
+      final target = pth.join(pth.dirname(filePath), '$stem${pth.extension(filePath)}');
+      if (target != filePath) {
+        if (await File(target).exists()) {
+          throw FileSystemException('A file with that name already exists', target);
+        }
+        filePath = (await File(filePath).rename(target)).path;
+      }
+    }
+    _updateEntry(playlistId, entryId, (x) => x.copyWith(title: title, filePath: filePath, renamed: true));
+    return byId(playlistId)?.entry(entryId);
+  }
+
   /// Files deleted outside the app come back as "not downloaded".
   Future<void> verifyFiles() async {
     for (final p in [..._playlists]) {
@@ -225,4 +249,13 @@ class LibraryService extends ChangeNotifier {
     _newEntries.close();
     super.dispose();
   }
+}
+
+/// File name (without extension) for an entry renamed to [title].
+@visibleForTesting
+String renamedStem(String title, String id) {
+  var t = title.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim().replaceAll(RegExp(r'[. ]+$'), '');
+  if (t.length > 100) t = t.substring(0, 100).trim();
+  final key = id.replaceAll(RegExp(r'[^\w-]'), '_');
+  return t.isEmpty ? '[$key]' : '$t [$key]';
 }

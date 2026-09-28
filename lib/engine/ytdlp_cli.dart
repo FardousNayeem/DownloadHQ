@@ -33,10 +33,35 @@ class EnvFlags {
   ];
 }
 
-List<String> playlistArgs(String url, EnvFlags env) => [
+/// Network flags every run gets. yt-dlp's defaults give up on the first
+/// dropped connection for extraction and retry downloads with no pause;
+/// flaky mobile data needs both retries and a back-off between them.
+const networkArgs = [
+  '--socket-timeout',
+  '30',
+  '--retries',
+  '10',
+  '--fragment-retries',
+  '10',
+  '--extractor-retries',
+  '5',
+  '--retry-sleep',
+  'http:exp=1:20',
+  '--retry-sleep',
+  'fragment:exp=1:20',
+  '--retry-sleep',
+  'extractor:exp=1:10',
+];
+
+/// Signed-in session exported from the in-app browser, when one is needed.
+List<String> cookieArgs(String? cookiesFile) => cookiesFile == null ? const [] : ['--cookies', cookiesFile];
+
+List<String> playlistArgs(String url, EnvFlags env, {String? cookiesFile}) => [
   '--flat-playlist',
   '--dump-single-json',
   '--no-warnings',
+  ...networkArgs,
+  ...cookieArgs(cookiesFile),
   ...env.toArgs(),
   url,
 ];
@@ -44,11 +69,13 @@ List<String> playlistArgs(String url, EnvFlags env) => [
 /// Like [playlistArgs], for any page. `--no-playlist` makes a video watched
 /// inside a playlist (`watch?v=..&list=..`) mean that video; pages that only
 /// are lists (channels, albums) still list their items.
-List<String> probeArgs(String url, EnvFlags env) => [
+List<String> probeArgs(String url, EnvFlags env, {String? cookiesFile}) => [
   '--flat-playlist',
   '--no-playlist',
   '--dump-single-json',
   '--no-warnings',
+  ...networkArgs,
+  ...cookieArgs(cookiesFile),
   ...env.toArgs(),
   url,
 ];
@@ -76,7 +103,7 @@ List<String> downloadArgs(DownloadSpec s, EnvFlags env) {
       // SponsorBlock's own auto-skip defaults: never the content itself.
       SponsorBlock.remove => ['--sponsorblock-remove', 'sponsor,selfpromo,interaction'],
     },
-    if (video && s.subtitles) ...['--write-subs', '--sub-langs', 'en.*,-live_chat', '--embed-subs'],
+    if (video && s.subtitles) ...subtitleArgs(autoCaptions: s.autoCaptions),
     '--write-thumbnail',
     '--convert-thumbnails',
     'jpg',
@@ -91,9 +118,44 @@ List<String> downloadArgs(DownloadSpec s, EnvFlags env) {
         '%(progress.total_bytes_estimate)s %(progress.speed)s %(progress.eta)s',
     '--print',
     'after_move:$_fileMark%(filepath)s',
+    ...networkArgs,
+    // Some networks advertise IPv6 they cannot route ("Network is
+    // unreachable"); a retry after such a failure goes over IPv4.
+    if (s.forceIpv4) '--force-ipv4',
+    ...cookieArgs(s.cookiesFile),
     ...env.toArgs(),
     s.url,
   ];
+}
+
+/// English subtitles embedded in the video, and no subtitle file left next
+/// to it. yt-dlp keeps the separate file whenever `--write-subs` comes with
+/// `--embed-subs`; `no-keep-subs` makes it delete the file after embedding.
+/// Converted to SRT first, because MP4 cannot take WebVTT as it comes, and
+/// the first track is flagged default so players show it without asking.
+List<String> subtitleArgs({required bool autoCaptions}) => [
+  '--write-subs',
+  // YouTube's own captions when the uploader gave none. Real subtitles win
+  // when a video has both.
+  if (autoCaptions) '--write-auto-subs',
+  '--sub-langs',
+  // en, en-US, en-GB... but not the untranslated "en-orig" auto track, a
+  // duplicate of "en" on YouTube.
+  'en.*,-en-orig,-live_chat',
+  '--convert-subs',
+  'srt',
+  '--embed-subs',
+  '--compat-options',
+  'no-keep-subs',
+  '--ppa',
+  'EmbedSubtitle+ffmpeg_o:-disposition:s:0 default',
+];
+
+/// A download that failed only because its subtitles could not be fetched
+/// (YouTube rate-limits caption requests). Worth retrying without them.
+bool isSubtitleError(String message) {
+  final m = message.toLowerCase();
+  return m.contains('subtitle') || m.contains('caption');
 }
 
 /// Parses one stdout line of a download; null if it is not a progress line.
@@ -218,4 +280,64 @@ String summariseError(String stderr) {
     return any.isEmpty ? 'yt-dlp failed' : any.last.trim();
   }
   return lines.last.replaceFirst('ERROR:', '').trim();
+}
+
+/// The site wants a signed-in user: private, members-only, age-gated, or
+/// YouTube's "confirm you're not a bot" wall. Browser cookies can fix it.
+bool isAuthError(String message) {
+  final m = message.toLowerCase();
+  return const [
+    'private video',
+    'sign in',
+    'login required',
+    'log in',
+    'logged-in',
+    'cookies',
+    'members-only',
+    'members only',
+    'join this channel',
+    'age-restricted',
+    'confirm your age',
+    'inappropriate for some users',
+    'not a bot',
+    'account',
+  ].any(m.contains);
+}
+
+/// A failure worth trying again unchanged: the network, not the video.
+bool isTransientError(String message) {
+  final m = message.toLowerCase();
+  return const [
+    'unreachable',
+    'unable to download',
+    'timed out',
+    'timeout',
+    'connection reset',
+    'connection refused',
+    'connection aborted',
+    'remote end closed',
+    'temporary failure',
+    'failed to resolve',
+    'name or service not known',
+    'getaddrinfo',
+    'no address associated',
+    'incompleteread',
+    'incomplete read',
+    'ssl',
+    'eof occurred',
+    'http error 5',
+    'http error 429',
+    'http error 403',
+    'errno',
+    'network',
+    'fragment',
+    'did not get any data',
+    'giving up after',
+  ].any(m.contains);
+}
+
+/// The failure mentioned IPv6 routing, or a plain "unreachable".
+bool isRoutingError(String message) {
+  final m = message.toLowerCase();
+  return m.contains('unreachable') || m.contains('errno 101') || m.contains('no route to host');
 }

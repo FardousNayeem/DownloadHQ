@@ -67,11 +67,12 @@ class ProcessEngine implements YtDlpEngine {
   }
 
   @override
-  Future<RemotePlaylist> fetchPlaylist(String url) async =>
-      parsePlaylistJson(await _capture((env) => playlistArgs(url, env)));
+  Future<RemotePlaylist> fetchPlaylist(String url, {String? cookiesFile}) async =>
+      parsePlaylistJson(await _capture((env) => playlistArgs(url, env, cookiesFile: cookiesFile)));
 
   @override
-  Future<ProbeResult> probe(String url) async => parseProbeJson(await _capture((env) => probeArgs(url, env)), url);
+  Future<ProbeResult> probe(String url, {String? cookiesFile}) async =>
+      parseProbeJson(await _capture((env) => probeArgs(url, env, cookiesFile: cookiesFile)), url);
 
   @override
   DownloadTask download(DownloadSpec spec) => _ProcessTask(this, spec).._start();

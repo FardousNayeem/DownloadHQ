@@ -115,7 +115,7 @@ bool _worthProbing(String url) {
 String friendlyProbeError(String raw) {
   if (raw.contains('Unsupported URL')) return 'Nothing downloadable on this page.';
   if (raw.contains('logged-in') || raw.contains('cookies') || raw.contains('Sign in')) {
-    return 'This site wants you signed in, which DownloadHQ does not do.';
+    return 'This needs you signed in. Sign in on this site, then try again.';
   }
   if (raw.contains('not installed') || raw.contains('took too long')) return raw;
   if (raw.contains('HTTP Error 404') || raw.contains('HTTP Error 410')) return 'This page does not exist.';
@@ -125,6 +125,9 @@ String friendlyProbeError(String raw) {
   if (raw.contains('Unable to download') || raw.contains('Failed to resolve') || raw.contains('timed out')) {
     return 'Could not reach the site. Check your connection.';
   }
-  if (raw.contains('Private video') || raw.contains('unavailable')) return 'This video is private or unavailable.';
+  if (raw.contains('Private video')) {
+    return 'This video is private. Sign in with an account that can see it, then retry.';
+  }
+  if (raw.contains('unavailable')) return 'This video is unavailable.';
   return raw.length > 160 ? '${raw.substring(0, 160)}...' : raw;
 }

@@ -66,15 +66,15 @@ class AndroidEngine implements YtDlpEngine {
   }
 
   @override
-  Future<RemotePlaylist> fetchPlaylist(String url) async {
-    final r = await _run('list-${_nextId++}', playlistArgs(url, await _envFlags()));
+  Future<RemotePlaylist> fetchPlaylist(String url, {String? cookiesFile}) async {
+    final r = await _run('list-${_nextId++}', playlistArgs(url, await _envFlags(), cookiesFile: cookiesFile));
     if (r.code != 0) throw EngineException(summariseError(r.err));
     return parsePlaylistJson(r.out);
   }
 
   @override
-  Future<ProbeResult> probe(String url) async {
-    final r = await _run('probe-${_nextId++}', probeArgs(url, await _envFlags()));
+  Future<ProbeResult> probe(String url, {String? cookiesFile}) async {
+    final r = await _run('probe-${_nextId++}', probeArgs(url, await _envFlags(), cookiesFile: cookiesFile));
     if (r.code != 0) throw EngineException(summariseError(r.err));
     return parseProbeJson(r.out, url);
   }

@@ -20,3 +20,9 @@ String formatAgo(DateTime? t, {DateTime? now}) {
   if (d.inDays < 1) return '${d.inHours} h ago';
   return '${d.inDays} d ago';
 }
+
+String formatBytes(int bytes) {
+  if (bytes >= 1 << 30) return '${(bytes / (1 << 30)).toStringAsFixed(2)} GB';
+  if (bytes >= 1 << 20) return '${(bytes / (1 << 20)).toStringAsFixed(1)} MB';
+  return '${(bytes / 1024).toStringAsFixed(0)} KB';
+}
