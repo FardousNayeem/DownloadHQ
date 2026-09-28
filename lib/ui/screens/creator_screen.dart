@@ -672,13 +672,6 @@ class _FeedbackCardState extends State<_FeedbackCard> {
           ),
 
           const SizedBox(height: 8),
-
-          Center(
-            child: Text(
-              'Opens your mail app with this filled in',
-              style: t.textTheme.bodySmall,
-            ),
-          ),
         ],
       ),
     );

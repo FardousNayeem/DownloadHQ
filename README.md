@@ -1,7 +1,6 @@
 # DownloadHQ
 
-A browser without ads that saves media from the pages you open, and keeps
-YouTube playlists on your device for offline playback. It tracks each
+A downloader with built in browser without ads that saves media from the pages you open, and keeps YouTube playlists on your device for offline playback. It tracks each
 playlist, flags videos added since the last check, and downloads the ones you
 pick as audio (m4a) or video (mp4, capped resolution). Runs on Android, Linux
 and Windows. No backend: all state is a few JSON files on the device.
